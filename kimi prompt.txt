@@ -1,0 +1,6 @@
+now it says
+Pos pos — undefined
+I also would want to put the defaults of sergent saucisse to be mid, and pos 1 to be talcolas and put me 3 default
+
+Also I noticed that if I pick 5 heros, it really just continues recommending heros.
+So currently, Id like to have itr fixed so that it says which player is listed, so dazzle cm and zeus is for sausage finger and pudge witch doctor is for talcolas etc. after that is fixed, I would want to have some sort of smart picks for our team, like it would know that if we picked a tidehunter for example, we dont need another offlane and it recommends the other positions. but if that makes it a bit hard to calculate, then thats fine we can do that layer of thinking on our own since we are all flexible on playing different positions.

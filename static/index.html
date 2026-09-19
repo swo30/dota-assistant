@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dota 2 Draft Assistant v2</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --panel: #161b22;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --muted: #8b949e;
+            --accent: #238636;
+            --accent-hover: #2ea043;
+            --danger: #da3633;
+            --warn: #d29922;
+            --blue: #58a6ff;
+            --purple: #a371f7;
+            --orange: #f0883e;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.5;
+            padding: 20px;
+        }
+        h1 { color: var(--blue); margin-bottom: 8px; font-size: 1.6rem; }
+        .subtitle { color: var(--muted); margin-bottom: 24px; font-size: 0.9rem; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            max-width: 1500px;
+            margin: 0 auto;
+        }
+        @media (max-width: 1000px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .panel h2 {
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding: 10px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.15s;
+        }
+        .mode-btn.active {
+            background: rgba(88,166,255,0.15);
+            border-color: var(--blue);
+            color: var(--blue);
+            font-weight: 600;
+        }
+        .mode-btn:hover:not(.active) {
+            border-color: var(--muted);
+            color: var(--text);
+        }
+
+        .preset-selector {
+            margin-bottom: 16px;
+        }
+        .preset-selector label {
+            display: block;
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+        }
+        .preset-selector select {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        .preset-desc {
+            color: var(--muted);
+            font-size: 0.8rem;
+            margin-top: 6px;
+            font-style: italic;
+        }
+
+        .player-row, .enemy-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+        .player-row input, .enemy-row select, .player-row select {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 10px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+        .player-row input:focus, .enemy-row select:focus, .player-row select:focus {
+            outline: none;
+            border-color: var(--blue);
+        }
+        .player-name { width: 120px; }
+        .player-id { width: 140px; }
+        .player-pos { width: 100px; }
+
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.15s;
+        }
+        .btn:hover { background: var(--accent-hover); }
+        .btn-secondary {
+            background: var(--border);
+            color: var(--text);
+        }
+        .btn-secondary:hover { background: #484f58; }
+        .btn-danger {
+            background: var(--danger);
+            padding: 6px 10px;
+            font-size: 0.75rem;
+        }
+        .btn-danger:hover { background: #f85149; }
+        .btn-purple {
+            background: var(--purple);
+            color: white;
+        }
+        .btn-purple:hover { background: #bc8ff7; }
+
+        .hero-select { min-width: 160px; }
+
+        .bans-area {
+            margin-top: 16px;
+        }
+        .ban-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .ban-tag {
+            background: rgba(218,54,51,0.15);
+            color: #ff7b72;
+            border: 1px solid var(--danger);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .ban-tag button {
+            background: none;
+            border: none;
+            color: #ff7b72;
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+        }
+
+        .recommendations {
+            margin-top: 20px;
+        }
+        .draft-mode .recommendations {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        @media (max-width: 1000px) {
+            .draft-mode .recommendations {
+                grid-template-columns: 1fr;
+            }
+        }
+        .draft-mode .rec-position {
+            margin-bottom: 0;
+        }
+        .rec-position {
+            margin-bottom: 24px;
+        }
+        .rec-position h3 {
+            font-size: 1rem;
+            color: var(--blue);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .rec-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: border-color 0.15s;
+            cursor: pointer;
+        }
+        .rec-card:hover { border-color: var(--blue); }
+        .rec-card.picked {
+            background: rgba(35,134,54,0.1);
+            border-color: var(--accent);
+        }
+        .rec-rank {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--warn);
+            min-width: 28px;
+            text-align: center;
+        }
+        .rec-hero {
+            font-weight: 600;
+            min-width: 120px;
+        }
+        .rec-score {
+            background: var(--accent);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .rec-details {
+            color: var(--muted);
+            font-size: 0.8rem;
+            flex: 1;
+        }
+        .rec-reason {
+            color: var(--muted);
+            font-size: 0.78rem;
+            font-style: italic;
+            margin-top: 2px;
+        }
+        .synergy-badge {
+            background: rgba(163,113,247,0.15);
+            color: var(--purple);
+            border: 1px solid var(--purple);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            margin-left: 6px;
+        }
+        .counter-badge {
+            background: rgba(242,136,62,0.15);
+            color: var(--orange);
+            border: 1px solid var(--orange);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            margin-left: 6px;
+        }
+        .preset-badge {
+            background: rgba(88,166,255,0.15);
+            color: var(--blue);
+            border: 1px solid var(--blue);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            margin-left: 6px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .loading {
+            color: var(--warn);
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        .empty-state {
+            color: var(--muted);
+            text-align: center;
+            padding: 40px;
+            font-style: italic;
+        }
+
+        .picked-heroes-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding: 10px;
+            background: rgba(35,134,54,0.05);
+            border-radius: 8px;
+            border: 1px dashed var(--accent);
+        }
+        .picked-hero-tag {
+            background: rgba(35,134,54,0.15);
+            color: #3fb950;
+            border: 1px solid var(--accent);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .picked-hero-tag button {
+            background: none;
+            border: none;
+            color: #3fb950;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+            font-size: 0.75rem;
+            color: var(--muted);
+        }
+        .stats-bar span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .tooltip {
+            position: relative;
+        }
+        .tooltip:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            z-index: 100;
+            color: var(--text);
+        }
+
+        /* ── Draft Mode ── */
+        .draft-mode .setup-panel {
+            display: none !important;
+        }
+        .draft-mode .draft-panel {
+            grid-column: 1 / -1;
+        }
+        .draft-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .draft-toggle:hover {
+            background: var(--accent-hover);
+        }
+        .draft-toggle.exit {
+            background: var(--danger);
+        }
+        .draft-toggle.exit:hover {
+            background: #f85149;
+        }
+        .draft-active-indicator {
+            position: fixed;
+            top: 20px;
+            right: 180px;
+            background: rgba(35,134,54,0.2);
+            color: #3fb950;
+            border: 1px solid var(--accent);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: none;
+            z-index: 1000;
+        }
+        .draft-mode .draft-active-indicator {
+            display: block;
+        }
+
+        /* ── Quick Enemy Bar ── */
+        .quick-enemy-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 12px;
+            background: rgba(218,54,51,0.08);
+            border: 1px solid var(--danger);
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .quick-enemy-bar label {
+            color: #ff7b72;
+            font-weight: 600;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }
+        .quick-enemy-bar input {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+        .quick-enemy-bar input:focus {
+            outline: none;
+            border-color: var(--danger);
+        }
+        .enemy-quick-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .enemy-quick-tag {
+            background: rgba(218,54,51,0.15);
+            color: #ff7b72;
+            border: 1px solid var(--danger);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .enemy-quick-tag button {
+            background: none;
+            border: none;
+            color: #ff7b72;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        /* ── Quick Ban on Cards ── */
+        .rec-card {
+            position: relative;
+        }
+        .quick-ban-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(218,54,51,0.2);
+            color: #ff7b72;
+            border: 1px solid var(--danger);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .rec-card:hover .quick-ban-btn {
+            opacity: 1;
+        }
+        .quick-ban-btn:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* ── Keyboard hint ── */
+        .kbd {
+            background: var(--border);
+            border: 1px solid #484f58;
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-size: 0.75rem;
+            font-family: monospace;
+        }
+
+        /* ── Refresh indicator ── */
+        .last-updated {
+            color: var(--muted);
+            font-size: 0.75rem;
+            text-align: right;
+            margin-bottom: 8px;
+        }
+
+        /* ── Compact rec card for draft mode ── */
+        .draft-mode .rec-card {
+            padding: 10px 12px;
+            margin-bottom: 6px;
+        }
+        .draft-mode .rec-details {
+            font-size: 0.75rem;
+        }
+        .draft-mode .rec-reason {
+            font-size: 0.72rem;
+        }
+    </style>
+</head>
+<body>
+    <button class="draft-toggle" id="draft-toggle" onclick="toggleDraftMode()">🎮 Enter Draft Mode</button>
+    <div class="draft-active-indicator">⚡ DRAFT MODE ACTIVE</div>
+    <h1>⚔️ Dota 2 Draft Assistant <span style="color: var(--muted); font-size: 0.6em;">v2.0</span></h1>
+    <p class="subtitle">Self-hosted draft helper with team synergy, presets, and counter-pick engine.</p>
+
+    <div class="grid" id="main-grid">
+        <!-- LEFT: Setup -->
+        <div class="setup-panel">
+            <div class="panel">
+                <h2>👥 Your Team</h2>
+
+                <!-- Mode Toggle -->
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="mode-personal" onclick="setMode('personal')">
+                        📊 Personal Stats
+                        <div style="font-size: 0.75rem; color: var(--muted); margin-top: 2px;">Use OpenDota profiles</div>
+                    </button>
+                    <button class="mode-btn" id="mode-manual" onclick="setMode('manual')">
+                        🎮 Manual / Preset
+                        <div style="font-size: 0.75rem; color: var(--muted); margin-top: 2px;">Strategy-based drafting</div>
+                    </button>
+                </div>
+
+                <!-- Preset Selector (hidden in personal mode) -->
+                <div class="preset-selector" id="preset-box" style="display: none;">
+                    <label>🎯 Draft Strategy Preset</label>
+                    <select id="preset-select" onchange="loadPreset()">
+                        <option value="">No preset — pure meta/counter</option>
+                    </select>
+                    <div class="preset-desc" id="preset-desc"></div>
+                </div>
+
+                <div id="team-container"></div>
+                <div class="actions">
+                    <button class="btn" onclick="addPlayer()">+ Add Player</button>
+                    <button class="btn btn-secondary" onclick="loadExampleTeam()">Load Example</button>
+                    <button class="btn btn-purple" onclick="loadDefaultTeam()">👥 Load My Team</button>
+                    <button class="btn btn-purple" onclick="clearTeam()">Clear</button>
+                </div>
+            </div>
+
+            <div class="panel" style="margin-top: 20px;">
+                <h2>🛡️ Bans</h2>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <select id="ban-select" class="hero-select">
+                        <option value="">Select hero to ban...</option>
+                    </select>
+                    <button class="btn" onclick="addBan()">Ban</button>
+                </div>
+                <div class="ban-tags" id="ban-tags"></div>
+            </div>
+
+            <div class="panel" style="margin-top: 20px;">
+                <h2>⚡ Actions</h2>
+                <div class="actions">
+                    <button class="btn" onclick="getRecommendations()" style="font-size: 1rem; padding: 12px 24px;">🎯 Get Recommendations</button>
+                    <button class="btn btn-secondary" onclick="clearAll()">Reset All</button>
+                </div>
+                <div id="status" class="loading" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Enemy + Results -->
+        <div class="draft-panel">
+            <div class="panel">
+                <h2>👹 Enemy Team</h2>
+                <div id="enemy-container"></div>
+                <div class="actions">
+                    <button class="btn" onclick="addEnemy()">+ Add Enemy Hero</button>
+                </div>
+            </div>
+
+            <div class="panel" style="margin-top: 20px;">
+                <h2>📊 Recommendations <span style="font-size: 0.7rem; color: var(--muted); font-weight: normal;">(<span class="kbd">R</span> to refresh)</span></h2>
+
+                <!-- Quick Enemy Pick Bar -->
+                <div class="quick-enemy-bar">
+                    <label>👹 Enemy:</label>
+                    <input type="text" id="quick-enemy-input" placeholder="Type hero name and hit Enter..."
+                        onkeydown="handleQuickEnemy(event)" autocomplete="off" list="hero-datalist">
+                    <datalist id="hero-datalist"></datalist>
+                    <div class="enemy-quick-tags" id="enemy-quick-tags"></div>
+                </div>
+
+                <div class="picked-heroes-bar" id="picked-bar" style="display: none;">
+                    <span style="color: var(--muted); font-size: 0.8rem;">Your picks:</span>
+                    <div id="picked-tags" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                </div>
+
+                <div class="stats-bar" id="stats-bar" style="display: none;">
+                    <span class="tooltip" data-tip="How well this hero fits the player's history">💪 Comfort</span>
+                    <span class="tooltip" data-tip="Hero role vs position expectation">🎯 Position</span>
+                    <span class="tooltip" data-tip="Win rate vs enemy heroes">⚔️ Counter</span>
+                    <span class="tooltip" data-tip="Synergy with already-picked teammates">🔗 Synergy</span>
+                    <span class="tooltip" data-tip="Current meta strength">📈 Meta</span>
+                </div>
+
+                <div class="last-updated" id="last-updated"></div>
+
+                <div id="recommendations" class="recommendations">
+                    <div class="empty-state">Configure your team and click "Get Recommendations"<br><span style="font-size: 0.8rem; color: var(--muted);">Shortcuts: <span class="kbd">R</span> refresh · <span class="kbd">D</span> draft mode · <span class="kbd">E</span> enemy · <span class="kbd">B</span> ban</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let heroes = [];
+        let heroMap = {};
+        let presets = {};
+        let team = [];
+        let enemies = [];
+        let bans = [];
+        let picked = [];
+        let mode = 'personal';
+        let currentPreset = '';
+
+        async function init() {
+            const [heroesResp, presetsResp] = await Promise.all([
+                fetch('/api/heroes'),
+                fetch('/api/presets')
+            ]);
+            heroes = await heroesResp.json();
+            presets = await presetsResp.json();
+            heroes.sort((a, b) => a.localized_name.localeCompare(b.localized_name));
+            heroMap = Object.fromEntries(heroes.map(h => [h.id, h]));
+            populateSelects();
+            populatePresets();
+            addPlayer(); addPlayer(); addPlayer(); addPlayer(); addPlayer();
+        }
+
+        function populateSelects() {
+            const opts = heroes.map(h => `<option value="${h.id}">${h.localized_name}</option>`).join('');
+            document.querySelectorAll('.hero-select').forEach(sel => {
+                const current = sel.value;
+                sel.innerHTML = '<option value="">Select hero...</option>' + opts;
+                sel.value = current;
+            });
+            const datalist = document.getElementById('hero-datalist');
+            if (datalist) {
+                datalist.innerHTML = heroes.map(h => `<option value="${h.localized_name}">`).join('');
+            }
+        }
+
+        function populatePresets() {
+            const sel = document.getElementById('preset-select');
+            let html = '<option value="">No preset — pure meta/counter</option>';
+            for (const [key, val] of Object.entries(presets)) {
+                html += `<option value="${key}">${val.name}</option>`;
+            }
+            sel.innerHTML = html;
+        }
+
+        function setMode(newMode) {
+            mode = newMode;
+            document.getElementById('mode-personal').classList.toggle('active', mode === 'personal');
+            document.getElementById('mode-manual').classList.toggle('active', mode === 'manual');
+            document.getElementById('preset-box').style.display = mode === 'manual' ? 'block' : 'none';
+            renderTeam();
+        }
+
+        async function loadPreset() {
+            const key = document.getElementById('preset-select').value;
+            currentPreset = key;
+            if (!key) {
+                document.getElementById('preset-desc').textContent = '';
+                return;
+            }
+            const resp = await fetch(`/api/presets/${key}`);
+            const preset = await resp.json();
+            document.getElementById('preset-desc').textContent = preset.description;
+        }
+
+        function addPlayer() {
+            const id = Date.now() + Math.random();
+            const pos = team.length + 1;
+            team.push({ id, account_id: '', position: Math.min(pos, 5), nickname: `Player ${pos}` });
+            renderTeam();
+        }
+
+        function removePlayer(id) {
+            team = team.filter(p => p.id !== id);
+            renderTeam();
+        }
+
+        function updatePlayer(id, field, value) {
+            const p = team.find(p => p.id === id);
+            if (p) p[field] = field === 'position' ? parseInt(value) : value;
+        }
+
+        function renderTeam() {
+            const container = document.getElementById('team-container');
+            const showIds = mode === 'personal';
+
+            container.innerHTML = team.map(p => `
+                <div class="player-row">
+                    <input class="player-name" placeholder="Nickname" value="${p.nickname}"
+                        onchange="updatePlayer(${p.id}, 'nickname', this.value)">
+                    ${showIds ? `<input class="player-id" placeholder="Account ID" value="${p.account_id}"
+                        onchange="updatePlayer(${p.id}, 'account_id', this.value)">` : ''}
+                    <select class="player-pos" onchange="updatePlayer(${p.id}, 'position', this.value)">
+                        <option value="1" ${p.position===1?'selected':''}>Pos 1 (Carry)</option>
+                        <option value="2" ${p.position===2?'selected':''}>Pos 2 (Mid)</option>
+                        <option value="3" ${p.position===3?'selected':''}>Pos 3 (Off)</option>
+                        <option value="4" ${p.position===4?'selected':''}>Pos 4 (Soft Sup)</option>
+                        <option value="5" ${p.position===5?'selected':''}>Pos 5 (Hard Sup)</option>
+                    </select>
+                    <button class="btn btn-danger" onclick="removePlayer(${p.id})">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function clearTeam() {
+            team = [];
+            renderTeam();
+        }
+
+        function addEnemy() {
+            enemies.push({ id: Date.now() + Math.random(), hero_id: '', position: null });
+            renderEnemies();
+        }
+
+        function removeEnemy(id) {
+            enemies = enemies.filter(e => e.id !== id);
+            renderEnemies();
+        }
+
+        function updateEnemy(id, field, value) {
+            const e = enemies.find(e => e.id === id);
+            if (e) e[field] = value ? parseInt(value) : null;
+        }
+
+        function renderEnemies() {
+            renderQuickEnemies();
+            const container = document.getElementById('enemy-container');
+            const opts = heroes.map(h => `<option value="${h.id}">${h.localized_name}</option>`).join('');
+            container.innerHTML = enemies.map(e => `
+                <div class="enemy-row">
+                    <select class="hero-select" onchange="updateEnemy(${e.id}, 'hero_id', this.value)">
+                        <option value="">Select enemy hero...</option>
+                        ${opts}
+                    </select>
+                    <select onchange="updateEnemy(${e.id}, 'position', this.value)" style="width: 100px; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px; border-radius: 5px;">
+                        <option value="">Pos?</option>
+                        <option value="1" ${e.position===1?'selected':''}>1</option>
+                        <option value="2" ${e.position===2?'selected':''}>2</option>
+                        <option value="3" ${e.position===3?'selected':''}>3</option>
+                        <option value="4" ${e.position===4?'selected':''}>4</option>
+                        <option value="5" ${e.position===5?'selected':''}>5</option>
+                    </select>
+                    <button class="btn btn-danger" onclick="removeEnemy(${e.id})">✕</button>
+                </div>
+            `).join('');
+            if (enemies.length === 0) container.innerHTML = '<div class="empty-state" style="padding: 20px;">No enemies yet — use the quick bar above or press <span class="kbd">E</span></div>';
+        }
+
+        function addBan() {
+            const sel = document.getElementById('ban-select');
+            const heroId = parseInt(sel.value);
+            if (!heroId || bans.includes(heroId)) return;
+            bans.push(heroId);
+            sel.value = '';
+            renderBans();
+        }
+
+        function removeBan(heroId) {
+            bans = bans.filter(b => b !== heroId);
+            renderBans();
+        }
+
+        function renderBans() {
+            const container = document.getElementById('ban-tags');
+            container.innerHTML = bans.map(b => `
+                <span class="ban-tag">
+                    ${heroMap[b]?.localized_name || b}
+                    <button onclick="removeBan(${b})">×</button>
+                </span>
+            `).join('');
+        }
+
+        function pickHero(heroId) {
+            if (picked.includes(heroId)) {
+                picked = picked.filter(h => h !== heroId);
+            } else {
+                picked.push(heroId);
+            }
+            renderPicked();
+            getRecommendations();
+        }
+
+        function renderPicked() {
+            const bar = document.getElementById('picked-bar');
+            const tags = document.getElementById('picked-tags');
+            if (picked.length === 0) {
+                bar.style.display = 'none';
+                return;
+            }
+            bar.style.display = 'flex';
+            tags.innerHTML = picked.map(h => `
+                <span class="picked-hero-tag">
+                    ${heroMap[h]?.localized_name || h}
+                    <button onclick="pickHero(${h})">×</button>
+                </span>
+            `).join('');
+        }
+
+        async function getRecommendations() {
+            const status = document.getElementById('status');
+            const container = document.getElementById('recommendations');
+            const statsBar = document.getElementById('stats-bar');
+
+            const validTeam = team.filter(p => {
+                if (mode === 'manual') return true;
+                return p.account_id && !isNaN(parseInt(p.account_id));
+            });
+
+            if (validTeam.length === 0) {
+                alert(mode === 'personal' ? 'Add at least one player with an Account ID' : 'Add at least one player slot');
+                return;
+            }
+
+            status.style.display = 'block';
+            status.textContent = mode === 'personal'
+                ? 'Fetching player data and crunching numbers...'
+                : 'Crunching strategy data...';
+            container.innerHTML = '<div class="empty-state">Loading...</div>';
+            statsBar.style.display = 'flex';
+
+            try {
+                const payload = {
+                    team: validTeam.map(p => ({
+                        account_id: mode === 'personal' ? parseInt(p.account_id) || null : null,
+                        position: p.position,
+                        nickname: p.nickname
+                    })),
+                    enemy_picks: enemies.filter(e => e.hero_id).map(e => ({
+                        hero_id: e.hero_id,
+                        position: e.position
+                    })),
+                    bans: bans,
+                    already_picked: picked,
+                    preset_key: currentPreset || null,
+                    use_manual: mode === 'manual'
+                };
+
+                const resp = await fetch('/api/draft/recommend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await resp.json();
+                renderRecommendations(data);
+                status.style.display = 'none';
+                document.getElementById('last-updated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+                container.innerHTML = '<div class="empty-state">Failed to load recommendations</div>';
+            }
+        }
+
+        function renderRecommendations(data) {
+            const container = document.getElementById('recommendations');
+
+            if (picked.length >= 5) {
+                container.innerHTML = `
+                    <div class="empty-state" style="background: rgba(35,134,54,0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 30px;">
+                        <h3 style="color: var(--accent); margin-bottom: 8px;">🎉 Draft Complete!</h3>
+                        <p style="color: var(--text);">All 5 team hero slots have been filled. Good luck in your match!</p>
+                    </div>`;
+                return;
+            }
+
+            let html = '';
+
+            for (const [nickname, pData] of Object.entries(data)) {
+                const recs = pData.recommendations;
+                if (!recs || recs.length === 0) continue;
+
+                const posNames = {1:'Carry', 2:'Mid', 3:'Offlane', 4:'Soft Sup', 5:'Hard Sup'};
+                const allowedStr = pData.allowed_positions.map(p => `Pos ${p} (${posNames[p]})`).join(', ');
+
+                html += `<div class="rec-position">
+                    <h3>👤 ${nickname} <span style="font-size: 0.75rem; color: var(--muted); font-weight: normal;">[${allowedStr}]</span></h3>`;
+
+                recs.slice(0, 5).forEach((rec, i) => {
+                    const isPicked = picked.includes(rec.hero_id);
+                    const badges = [];
+                    if (rec.synergy_score > 0.6) badges.push('<span class="synergy-badge">🔗 Synergy</span>');
+                    if (rec.counter_score > 0.6) badges.push('<span class="counter-badge">⚔️ Counter</span>');
+                    if (rec.preset_bonus > 0.15) badges.push('<span class="preset-badge">🎯 Strategy</span>');
+
+                    html += `
+                        <div class="rec-card ${isPicked ? 'picked' : ''}" onclick="pickHero(${rec.hero_id})">
+                            <button class="quick-ban-btn" onclick="quickBan(${rec.hero_id}, event)" title="Ban this hero">🚫 BAN</button>
+                            <div class="rec-rank">#${i+1}</div>
+                            <div class="rec-hero">
+                                ${rec.hero_name}${badges.join('')}
+                            </div>
+                            <div class="rec-score">${(rec.score * 100).toFixed(0)}</div>
+                            <div class="rec-details">
+                                ${mode === 'personal' && rec.games_played > 0 ? `<span style="color: var(--blue); font-weight: 600;">${rec.games_played}g · ${(rec.win_rate * 100).toFixed(0)}% WR</span> · ` : ''}
+                                <span style="color: var(--muted);">C:${(rec.player_comfort*100).toFixed(0)} P:${(rec.position_fit*100).toFixed(0)} X:${(rec.counter_score*100).toFixed(0)} S:${(rec.synergy_score*100).toFixed(0)} M:${(rec.meta_score*100).toFixed(0)}</span>
+                                <div class="rec-reason">${rec.reason}</div>
+                                ${rec.synergies_with.length > 0 ? `<div style="font-size: 0.7rem; color: var(--purple); margin-top: 2px;">💜 Synergizes with: ${rec.synergies_with.join(', ')}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+
+            container.innerHTML = html || '<div class="empty-state">No recommendations available</div>';
+        }
+
+        function loadExampleTeam() {
+            if (mode === 'personal') {
+                team = [
+                    { id: 1, account_id: '87278757', position: 2, nickname: 'MidPlayer' },
+                    { id: 2, account_id: '86745912', position: 1, nickname: 'CarryPlayer' },
+                    { id: 3, account_id: '118774641', position: 3, nickname: 'Offlaner' },
+                ];
+            } else {
+                team = [
+                    { id: 1, account_id: '', position: 1, nickname: 'Carry' },
+                    { id: 2, account_id: '', position: 2, nickname: 'Mid' },
+                    { id: 3, account_id: '', position: 3, nickname: 'Offlane' },
+                ];
+            }
+            renderTeam();
+        }
+
+        function clearAll() {
+            team = [];
+            enemies = [];
+            bans = [];
+            picked = [];
+            currentPreset = '';
+            document.getElementById('preset-select').value = '';
+            document.getElementById('preset-desc').textContent = '';
+            document.getElementById('last-updated').textContent = '';
+            renderTeam();
+            renderEnemies();
+            renderBans();
+            renderPicked();
+            renderQuickEnemies();
+            document.getElementById('recommendations').innerHTML = '<div class="empty-state">Configure your team and click "Get Recommendations"<br><span style="font-size: 0.8rem; color: var(--muted);">Shortcuts: <span class="kbd">R</span> refresh · <span class="kbd">D</span> draft mode · <span class="kbd">E</span> enemy · <span class="kbd">B</span> ban</span></div>';
+            document.getElementById('stats-bar').style.display = 'none';
+        }
+
+        async function loadDefaultTeam() {
+            try {
+                const resp = await fetch('/api/team/default');
+                const data = await resp.json();
+
+                if (!data.players || data.players.length === 0) {
+                    alert('No default team configured. Edit data/default_team.json to add your squad.');
+                    return;
+                }
+
+                team = data.players.map((p, idx) => ({
+                    id: Date.now() + idx,
+                    account_id: p.account_id ? String(p.account_id) : '',
+                    position: p.default_position || 1,
+                    nickname: p.nickname || `Player ${idx + 1}`
+                }));
+
+                renderTeam();
+                document.getElementById('status').style.display = 'block';
+                document.getElementById('status').textContent = `Loaded ${team.length} players from default_team.json`;
+                setTimeout(() => { document.getElementById('status').style.display = 'none'; }, 3000);
+            } catch (err) {
+                alert('Failed to load default team: ' + err.message);
+            }
+        }
+
+        let isDraftMode = false;
+        function toggleDraftMode() {
+            isDraftMode = !isDraftMode;
+            document.body.classList.toggle('draft-mode', isDraftMode);
+            const btn = document.getElementById('draft-toggle');
+            if (isDraftMode) {
+                btn.textContent = '✕ Exit Draft Mode';
+                btn.classList.add('exit');
+            } else {
+                btn.textContent = '🎮 Enter Draft Mode';
+                btn.classList.remove('exit');
+            }
+        }
+
+        function handleQuickEnemy(event) {
+            if (event.key !== 'Enter') return;
+            const input = document.getElementById('quick-enemy-input');
+            const query = input.value.trim().toLowerCase();
+            if (!query) return;
+
+            const match = heroes.find(h =>
+                h.localized_name.toLowerCase() === query ||
+                h.localized_name.toLowerCase().includes(query)
+            );
+
+            if (!match) {
+                const partial = heroes.find(h =>
+                    h.localized_name.toLowerCase().replace(/[^a-z]/g, '').includes(query.replace(/[^a-z]/g, ''))
+                );
+                if (!partial) {
+                    input.style.borderColor = 'var(--danger)';
+                    setTimeout(() => input.style.borderColor = '', 500);
+                    return;
+                }
+                addQuickEnemy(partial.id);
+            } else {
+                addQuickEnemy(match.id);
+            }
+
+            input.value = '';
+            input.style.borderColor = 'var(--accent)';
+            setTimeout(() => input.style.borderColor = '', 300);
+        }
+
+        function addQuickEnemy(heroId) {
+            if (enemies.some(e => e.hero_id === heroId)) return;
+            enemies.push({ id: Date.now(), hero_id: heroId, position: null });
+            renderQuickEnemies();
+            if (document.getElementById('recommendations').innerHTML.includes('rec-card')) {
+                getRecommendations();
+            }
+        }
+
+        function removeQuickEnemy(heroId) {
+            enemies = enemies.filter(e => e.hero_id !== heroId);
+            renderQuickEnemies();
+            renderEnemies();
+            if (document.getElementById('recommendations').innerHTML.includes('rec-card')) {
+                getRecommendations();
+            }
+        }
+
+        function renderQuickEnemies() {
+            const container = document.getElementById('enemy-quick-tags');
+            container.innerHTML = enemies.filter(e => e.hero_id).map(e => `
+                <span class="enemy-quick-tag">
+                    ${heroMap[e.hero_id]?.localized_name || e.hero_id}
+                    <button onclick="removeQuickEnemy(${e.hero_id})">×</button>
+                </span>
+            `).join('');
+        }
+
+        function quickBan(heroId, event) {
+            event.stopPropagation();
+            if (bans.includes(heroId)) return;
+            bans.push(heroId);
+            renderBans();
+            renderQuickEnemies();
+            getRecommendations();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+                if (e.key === 'Escape') {
+                    e.target.blur();
+                }
+                return;
+            }
+
+            switch(e.key.toLowerCase()) {
+                case 'r':
+                    e.preventDefault();
+                    getRecommendations();
+                    break;
+                case 'd':
+                    e.preventDefault();
+                    toggleDraftMode();
+                    break;
+                case 'e':
+                    e.preventDefault();
+                    document.getElementById('quick-enemy-input').focus();
+                    break;
+                case 'b':
+                    e.preventDefault();
+                    document.getElementById('ban-select').focus();
+                    break;
+            }
+        });
+
+        const origRenderBans = renderBans;
+        renderBans = function() {
+            origRenderBans();
+            const recs = document.getElementById('recommendations');
+            if (recs && recs.innerHTML.includes('rec-card') && !recs.innerHTML.includes('Loading')) {
+                clearTimeout(window._banRefreshTimeout);
+                window._banRefreshTimeout = setTimeout(() => {
+                    getRecommendations();
+                }, 300);
+            }
+        };
+
+        init();
+    </script>
+</body>
+</html>
