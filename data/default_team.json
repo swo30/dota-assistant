@@ -1,64 +1,36 @@
 {
-  "_readme": "Squad config. allowed_positions = which roles each player can play. MIN_GAMES_THRESHOLD in app.py = minimum games for a hero to be suggested.",
+  "_readme": "Squad config. MIN_GAMES_THRESHOLD in app.py = minimum games for a hero to be suggested.",
   "players": [
     {
-      "account_id": 62679020,
-      "nickname": "Sausage Fingers",
-      "default_position": 3,
-      "allowed_positions": [
-        2,
-        3,
-        4,
-        5
-      ],
-      "notes": "You - plays everything except carry"
+      "account_id": 57683770,
+      "nickname": "Tal'colas",
+      "default_position": 1,
+      "notes": "Nic"
     },
     {
       "account_id": 121466141,
       "nickname": "Sergent Saucisse",
       "default_position": 2,
-      "allowed_positions": [
-        1,
-        2,
-        3
-      ],
-      "notes": "Tony - carry, sometimes mid, rarely offlane"
+      "notes": "Tony"
     },
     {
-      "account_id": 57683770,
-      "nickname": "Tal'colas",
-      "default_position": 1,
-      "allowed_positions": [
-        1,
-        2,
-        3,
-        4,
-        5
-      ],
-      "notes": "Nic - plays everything"
+      "account_id": 62679020,
+      "nickname": "Sausage Fingers",
+      "default_position": 3,
+      "notes": "You"
     },
+
     {
       "account_id": 95627571,
       "nickname": "Jean Ticippe",
       "default_position": 4,
-      "allowed_positions": [
-        1,
-        2,
-        3,
-        4,
-        5
-      ],
-      "notes": "Pat - plays everything"
+      "notes": "Pat"
     },
     {
       "account_id": 70222935,
       "nickname": "Mirix",
       "default_position": 5,
-      "allowed_positions": [
-        4,
-        5
-      ],
-      "notes": "Hard support - only 4 or 5. Profile may be private."
+      "notes": "Hard support"
     }
   ]
 }

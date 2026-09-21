@@ -576,8 +576,8 @@
                 <div id="team-container"></div>
                 <div class="actions">
                     <button class="btn" onclick="addPlayer()">+ Add Player</button>
-                    <button class="btn btn-secondary" onclick="loadExampleTeam()">Load Example</button>
-                    <button class="btn btn-purple" onclick="loadDefaultTeam()">👥 Load My Team</button>
+                    <button class="btn btn-secondary" onclick="addRando()">+ Add Rando</button>
+                    <button class="btn btn-purple" onclick="loadDefaultTeam()">👥 Reload Team</button>
                     <button class="btn btn-purple" onclick="clearTeam()">Clear</button>
                 </div>
             </div>
@@ -669,7 +669,7 @@
             heroMap = Object.fromEntries(heroes.map(h => [h.id, h]));
             populateSelects();
             populatePresets();
-            addPlayer(); addPlayer(); addPlayer(); addPlayer(); addPlayer();
+            await loadDefaultTeam(); // Automatically load team on startup!
         }
 
         function populateSelects() {
@@ -721,8 +721,20 @@
             renderTeam();
         }
 
+        function addRando() {
+            const id = Date.now() + Math.random();
+            const pos = team.length + 1;
+            team.push({ id, account_id: '', position: Math.min(pos, 5), nickname: 'Rando' });
+            renderTeam();
+        }
+
         function removePlayer(id) {
-            team = team.filter(p => p.id !== id);
+            const index = team.findIndex(p => p.id === id);
+            if (index !== -1) {
+                const pos = team[index].position;
+                const newId = Date.now() + Math.random();
+                team[index] = { id: newId, account_id: '', position: pos, nickname: 'Rando' };
+            }
             renderTeam();
         }
 
@@ -735,22 +747,27 @@
             const container = document.getElementById('team-container');
             const showIds = mode === 'personal';
 
-            container.innerHTML = team.map(p => `
-                <div class="player-row">
-                    <input class="player-name" placeholder="Nickname" value="${p.nickname}"
-                        onchange="updatePlayer(${p.id}, 'nickname', this.value)">
-                    ${showIds ? `<input class="player-id" placeholder="Account ID" value="${p.account_id}"
-                        onchange="updatePlayer(${p.id}, 'account_id', this.value)">` : ''}
-                    <select class="player-pos" onchange="updatePlayer(${p.id}, 'position', this.value)">
-                        <option value="1" ${p.position===1?'selected':''}>Pos 1 (Carry)</option>
-                        <option value="2" ${p.position===2?'selected':''}>Pos 2 (Mid)</option>
-                        <option value="3" ${p.position===3?'selected':''}>Pos 3 (Off)</option>
-                        <option value="4" ${p.position===4?'selected':''}>Pos 4 (Soft Sup)</option>
-                        <option value="5" ${p.position===5?'selected':''}>Pos 5 (Hard Sup)</option>
-                    </select>
-                    <button class="btn btn-danger" onclick="removePlayer(${p.id})">✕</button>
-                </div>
-            `).join('');
+            container.innerHTML = team.map(p => {
+                const isRandoPlayer = p.nickname.trim().toLowerCase() === 'rando' || p.nickname.trim().toLowerCase() === 'random';
+                const showAccountField = showIds && !isRandoPlayer;
+
+                return `
+                    <div class="player-row">
+                        <input class="player-name" placeholder="Nickname / Rando" value="${p.nickname}"
+                            onchange="updatePlayer(${p.id}, 'nickname', this.value)">
+                        ${showAccountField ? `<input class="player-id" placeholder="Account ID" value="${p.account_id}"
+                            onchange="updatePlayer(${p.id}, 'account_id', this.value)">` : ''}
+                        <select class="player-pos" onchange="updatePlayer(${p.id}, 'position', this.value)">
+                            <option value="1" ${p.position===1?'selected':''}>Pos 1 (Carry)</option>
+                            <option value="2" ${p.position===2?'selected':''}>Pos 2 (Mid)</option>
+                            <option value="3" ${p.position===3?'selected':''}>Pos 3 (Off)</option>
+                            <option value="4" ${p.position===4?'selected':''}>Pos 4 (Soft Sup)</option>
+                            <option value="5" ${p.position===5?'selected':''}>Pos 5 (Hard Sup)</option>
+                        </select>
+                        <button class="btn btn-danger" onclick="removePlayer(${p.id})">✕</button>
+                    </div>
+                `;
+            }).join('');
         }
 
         function clearTeam() {
@@ -852,13 +869,8 @@
             const container = document.getElementById('recommendations');
             const statsBar = document.getElementById('stats-bar');
 
-            const validTeam = team.filter(p => {
-                if (mode === 'manual') return true;
-                return p.account_id && !isNaN(parseInt(p.account_id));
-            });
-
-            if (validTeam.length === 0) {
-                alert(mode === 'personal' ? 'Add at least one player with an Account ID' : 'Add at least one player slot');
+            if (team.length === 0) {
+                alert('Add at least one player to your team');
                 return;
             }
 
@@ -871,11 +883,14 @@
 
             try {
                 const payload = {
-                    team: validTeam.map(p => ({
-                        account_id: mode === 'personal' ? parseInt(p.account_id) || null : null,
-                        position: p.position,
-                        nickname: p.nickname
-                    })),
+                    team: team.map(p => {
+                        const isRando = p.nickname.trim().toLowerCase() === 'rando' || p.nickname.trim().toLowerCase() === 'random';
+                        return {
+                            account_id: (mode === 'personal' && !isRando) ? (parseInt(p.account_id) || null) : null,
+                            position: p.position,
+                            nickname: p.nickname
+                        };
+                    }),
                     enemy_picks: enemies.filter(e => e.hero_id).map(e => ({
                         hero_id: e.hero_id,
                         position: e.position
@@ -921,10 +936,11 @@
                 if (!recs || recs.length === 0) continue;
 
                 const posNames = {1:'Carry', 2:'Mid', 3:'Offlane', 4:'Soft Sup', 5:'Hard Sup'};
-                const allowedStr = pData.allowed_positions.map(p => `Pos ${p} (${posNames[p]})`).join(', ');
+                const posVal = pData.position;
+                const posStr = `Pos ${posVal} (${posNames[posVal] || ''})`;
 
                 html += `<div class="rec-position">
-                    <h3>👤 ${nickname} <span style="font-size: 0.75rem; color: var(--muted); font-weight: normal;">[${allowedStr}]</span></h3>`;
+                    <h3>👤 ${nickname} <span style="font-size: 0.75rem; color: var(--muted); font-weight: normal;">[${posStr}]</span></h3>`;
 
                 recs.slice(0, 5).forEach((rec, i) => {
                     const isPicked = picked.includes(rec.hero_id);
@@ -954,23 +970,6 @@
             }
 
             container.innerHTML = html || '<div class="empty-state">No recommendations available</div>';
-        }
-
-        function loadExampleTeam() {
-            if (mode === 'personal') {
-                team = [
-                    { id: 1, account_id: '87278757', position: 2, nickname: 'MidPlayer' },
-                    { id: 2, account_id: '86745912', position: 1, nickname: 'CarryPlayer' },
-                    { id: 3, account_id: '118774641', position: 3, nickname: 'Offlaner' },
-                ];
-            } else {
-                team = [
-                    { id: 1, account_id: '', position: 1, nickname: 'Carry' },
-                    { id: 2, account_id: '', position: 2, nickname: 'Mid' },
-                    { id: 3, account_id: '', position: 3, nickname: 'Offlane' },
-                ];
-            }
-            renderTeam();
         }
 
         function clearAll() {
@@ -1004,7 +1003,7 @@
                 team = data.players.map((p, idx) => ({
                     id: Date.now() + idx,
                     account_id: p.account_id ? String(p.account_id) : '',
-                    position: p.default_position || 1,
+                    position: p.default_position || (idx + 1),
                     nickname: p.nickname || `Player ${idx + 1}`
                 }));
 

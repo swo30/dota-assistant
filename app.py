@@ -33,33 +33,10 @@ MATCHUP_CACHE_DIR = os.path.join(CACHE_DIR, "matchups")
 SYNERGY_CACHE_FILE = os.path.join(CACHE_DIR, "synergy_dynamic.json")
 CACHE_TTL_SECONDS = int(os.environ.get("CACHE_TTL", 3600 * 6))  # 6 hours default
 
-# ── Player Position Flexibility Config ──
-# Maps each player nickname to their allowed positions.
-# If a player is not listed here, they default to their default_position only.
-# Positions: 1=Carry, 2=Mid, 3=Offlane, 4=Soft Support, 5=Hard Support
-PLAYER_POSITIONS: Dict[str, List[int]] = {}
-
 # ── Minimum Games Filter ──
 # Heroes with fewer than this many games won't be suggested for that player.
 # Set to 0 to disable. Only applies to personal stats mode.
 MIN_GAMES_THRESHOLD: int = 20
-
-def load_player_positions():
-    """Load player position flexibility from default_team.json or a separate config."""
-    global PLAYER_POSITIONS
-    try:
-        with open(os.path.join(DATA_DIR, "default_team.json"), "r") as f:
-            team_data = json.load(f)
-            for p in team_data.get("players", []):
-                nickname = p.get("nickname", "")
-                allowed = p.get("allowed_positions")
-                if allowed:
-                    PLAYER_POSITIONS[nickname] = allowed
-    except Exception as e:
-        print(f"Warning: Could not load player positions: {e}")
-        PLAYER_POSITIONS = {}
-
-load_player_positions()
 
 os.makedirs(PLAYER_CACHE_DIR, exist_ok=True)
 os.makedirs(MATCHUP_CACHE_DIR, exist_ok=True)
@@ -115,7 +92,7 @@ POSITION_ROLES = {
 
 # ── Models ──
 class PlayerSetup(BaseModel):
-    account_id: Optional[int] = None  # None = manual mode
+    account_id: Optional[int] = None  # None = manual / rando mode
     position: int  # 1-5
     nickname: str = ""
 
@@ -423,56 +400,42 @@ class DraftEngine:
         top_n: int = 8,
     ) -> Dict[str, dict]:
         """
-        Returns recommendations grouped by player nickname.
+        Returns recommendations grouped by player nickname based strictly on their current dropdown position.
         """
         team_picks = list(state.already_picked)
-        is_manual = state.use_manual or all(p.account_id is None for p in state.team)
-
-        player_data = {}
-        for player in state.team:
-            hero_stats_map = {}
-            if not is_manual and player.account_id:
-                try:
-                    player_heroes = OpenDotaClient.get_player_heroes(player.account_id)
-                    hero_stats_map = {ph["hero_id"]: ph for ph in player_heroes}
-                except Exception as e:
-                    print(f"Failed to fetch player {player.account_id}: {e}")
-            player_data[player.nickname] = {
-                "player": player,
-                "hero_stats": hero_stats_map,
-                "allowed_positions": PLAYER_POSITIONS.get(player.nickname, [player.position])
-            }
+        is_manual_mode = state.use_manual
 
         results = {}
         used_heroes = set(team_picks)
 
-        for nickname, pdata in player_data.items():
-            player = pdata["player"]
-            allowed = pdata["allowed_positions"]
+        for player in state.team:
+            nickname = player.nickname.strip() or f"Player {player.position}"
+            is_player_rando = nickname.lower() in ["rando", "random"]
+            is_player_manual = is_manual_mode or is_player_rando or not player.account_id
+
+            hero_stats_map = {}
+            if not is_player_manual and player.account_id:
+                try:
+                    player_heroes = OpenDotaClient.get_player_heroes(int(player.account_id))
+                    hero_stats_map = {ph["hero_id"]: ph for ph in player_heroes}
+                except Exception as e:
+                    print(f"Failed to fetch player {player.account_id}: {e}")
 
             player_scored = []
-
-            for pos in allowed:
-                temp_player = PlayerSetup(
-                    account_id=player.account_id,
-                    position=pos,
-                    nickname=player.nickname
+            for hero_id in self.heroes:
+                rec = self.score_hero_for_player(
+                    hero_id=hero_id,
+                    player=player,
+                    player_hero_data=hero_stats_map.get(hero_id, {}),
+                    enemy_picks=state.enemy_picks,
+                    team_picks=team_picks,
+                    bans=state.bans,
+                    preset_key=state.preset_key,
+                    is_manual=is_player_manual,
                 )
-
-                for hero_id in self.heroes:
-                    rec = self.score_hero_for_player(
-                        hero_id=hero_id,
-                        player=temp_player,
-                        player_hero_data=pdata["hero_stats"].get(hero_id, {}),
-                        enemy_picks=state.enemy_picks,
-                        team_picks=team_picks,
-                        bans=state.bans,
-                        preset_key=state.preset_key,
-                        is_manual=is_manual,
-                    )
-                    if rec:
-                        rec.reason = f"Pos {pos} fit; {rec.reason}"
-                        player_scored.append((rec.score, rec))
+                if rec:
+                    rec.reason = f"Pos {player.position} fit; {rec.reason}"
+                    player_scored.append((rec.score, rec))
 
             player_scored.sort(key=lambda x: x[0], reverse=True)
 
@@ -488,8 +451,7 @@ class DraftEngine:
                     break
 
             results[nickname] = {
-                "default_position": player.position,
-                "allowed_positions": allowed,
+                "position": player.position,
                 "recommendations": final_player_recs
             }
 
